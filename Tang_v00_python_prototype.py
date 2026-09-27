@@ -4,20 +4,22 @@ from pyglet.window import key
 
 #Definitions
 def SystemStart():
-    global LIMB
-    LIMB = []
-    global LIMB_Size
-    LIMB_Size = toInt("1"*byteSize)
-    for x in range(LIMB_Size):
-        LIMB.append("0"*byteSize)
+    global PTIMB
+    PTIMB = []
+    global PTIMB_Size
+    global maxByteAmount
+    maxByteAmount = toInt("1"*byteSize)
+    PTIMB_Size = maxByteAmount
+    for x in range(PTIMB_Size):
+        PTIMB.append("0"*byteSize)
         
     global running
     running = True
         
 def toString(number: int) -> str:
     #Converts an integer between 0 and 255 into an 8-bit binary string.  
-    if not (0 <= number <= 255):
-        raise ValueError("Number must be between 0 and 255 for an 8-bit byte.")
+    if not (0 <= number <= maxByteAmount):
+        raise ValueError(f"Number must be between 0 and {maxByteAmount} for an 8-bit byte.")
         
     return f"{number:0{byteSize}b}"
     
@@ -29,29 +31,30 @@ def toInt(bit_string: str) -> int:
     return int(bit_string, 2)
 
 def newData(index, length):
-    if(LIMB[index] != "0"*byteSize):
-        raise ValueError("LIMB space is occupied")
-    LIMB[index] = toString(length + index + 2)
-    LIMB[index + 1] = "0"*byteSize
-    LIMB[index + length + 2] = toString(index)
+    if(PTIMB[index] != "0"*byteSize):
+        raise ValueError("PTIMB space is occupied")
+    PTIMB[index] = toString(length + index + 2)
+    PTIMB[index + 1] = "0"*byteSize
+    PTIMB[index + length + 2] = toString(index)
+    PTIMB[PTIMB_AvaiableAddress] = toString(index + length + 3)
 
 def insertItem(indexOfData, atPos, inject): #The index of the Array, what you are injecting, and where in the array you want it to go.
     if len(inject) != byteSize:
         raise ValueError(f"The input string must be exactly {byteSize} bits long.")
-    if(toInt(LIMB[toInt(LIMB[indexOfData])]) != indexOfData):
-        raise ValueError("Selected LIMB is not closed.")
-    if(toInt(LIMB[indexOfData])<=atPos + indexOfData):
-        raise ValueError("LIMB is not long enough to contain data at specified index.")
+    if(toInt(PTIMB[toInt(PTIMB[indexOfData])]) != indexOfData):
+        raise ValueError("Selected PTIMB is not closed.")
+    if(toInt(PTIMB[indexOfData])<=atPos + indexOfData):
+        raise ValueError("PTIMB is not long enough to contain data at specified index.")
 
-    LIMB[indexOfData + 2 + atPos] = inject
+    PTIMB[indexOfData + 2 + atPos] = inject
    
-def addItem(index, add): #Streamlined method for adding to a LIMB array.
-    insertItem(index, toInt(LIMB[index+1]), add)
-    indexPointer = toInt(LIMB[index+1]) + 1
-    LIMB[index+1] = toString(indexPointer)
+def addItem(index: int, add: str): #Streamlined method for adding to a PTIMB array.
+    insertItem(index, toInt(PTIMB[index + 1]), add)
+    indexPointer = toInt(PTIMB[index + 1]) + 1
+    PTIMB[index+1] = toString(indexPointer)
     
 def getItem(source: int, index: int) -> int:
-    return LIMB[source + 2 + index]
+    return PTIMB[source + 2 + index]
     
 def splitString(input, delim, outpIndex):
     i = 0
@@ -87,36 +90,50 @@ def CitrusReadComponent(byte):
     if(byte == toString(2)):
         print("The current interpreter is Citrus")
         
-def newLIMB(name, length):
-    LIMB_Avaiable += length + 3
-    addItem(14)
+def alloc(length):
+    indexof = toInt(PTIMB[PTIMB_AvaiableAddress])   
+    newData(toInt(PTIMB[PTIMB_AvaiableAddress]), length)
+    return(indexof)
+
+def printRAM(start: int, finish: int):
+    i2 = start
+    for x in range(finish - start):
+        print(f"{PTIMB[x]} ({toInt(PTIMB[x])})    -    [{i2}]")
+        i2 += 1
     
         
 def loadProcess(code):
-    
-    splitString(code, "," , processLIMBaddress)
+    # Asset Array Key:
+    # 1 - Code array address
+    # 2 - Stack array address
+    # 3 - Instruction Pointer
+    # 4 - Read state
+    assetAddress = alloc(10) #Create asset array
+    codeAddress = alloc(10) # Create container for the code to go in
+    stackAddress = alloc(10) # Create stack array
+    addItem(assetAddress, toString(codeAddress)) # Register code array as asset
+    addItem(assetAddress, toString(stackAddress)) # Register Stack array as asset
+    addItem(assetAddress, toString(0)) # Instruction pointer asset
+    addItem(assetAddress, toString(1)) # Read state asset
+    splitString(code, "," , codeAddress) # Split code into code array
+    addItem(processPTIMBaddress, toString(assetAddress)) # Register process after asset array is fully assembled
 
 # Initialize important variables for Processes
-processLIMBaddress = 1
-LIMB_Avaiable = 0
+processPTIMBaddress = 1
+PTIMB_AvaiableAddress = 0
 byteSize = 16
 #Start of program
 SystemStart()
 
-#There are many good reasons not to start data at 0.
-newData(processLIMBaddress,10)
-newData(14,10)
-newData(27,10)
+# Where processes are registered to run
+newData(processPTIMBaddress,10)
 
 loadProcess(f"{toString(1)},{toString(2)}")
 
-i2 = 0
-for x in range(50):
-    print(f"{LIMB[x]} ({toInt(LIMB[x])})    -    [{i2}]")
-    i2 += 1
+# printRAM(0,100)
 
 instructionPointer = 0
-count = toInt(LIMB[2])
+count = toInt(PTIMB[2])
 
 """
 while(instructionPointer <= count):
