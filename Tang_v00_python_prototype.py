@@ -148,18 +148,24 @@ printRAM(0,100)
 processPointer = 0
 count = toInt(PTIMB[processPTIMBaddress + 1])
 
-while(True):
+for x in range(3):
     #Find indexes & locations
     currentProcAssetsIndex = toInt(getItem(processPTIMBaddress, processPointer))
     currentProcCodeIndex = toInt(PTIMB[currentProcAssetsIndex + 2])
     currentProcIP = toInt(getItem(currentProcAssetsIndex, 2))
-    
+    currentProcStackAddress = toInt(getItem(currentProcAssetsIndex, 1))
+    currentProcReadState = toInt(getItem(currentProcAssetsIndex, 3))
     # Read item
-
-    CitrusReadComponent(PTIMB[currentProcIP])
+    if(currentProcReadState == 1):
+        CitrusReadComponent(PTIMB[currentProcIP])
+    elif(currentProcReadState == 2):
+        addItem(currentProcStackAddress, PTIMB[currentProcIP])
+    
+    #Increase insruction pointer
+    print(f"DEBUG: {}")
     processPointer += 1 
     if(processPointer > count):
         processPointer = 0
     
-    breakpoint("Done")
+    
     
