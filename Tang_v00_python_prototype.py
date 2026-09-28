@@ -153,10 +153,11 @@ while(True):
     currentProcAssetsIndex = toInt(getItem(processPTIMBaddress, processPointer))
     currentProcCodeIndex = toInt(PTIMB[currentProcAssetsIndex + 2])
     currentProcIP = toInt(getItem(currentProcAssetsIndex, 2))
-    
+    currentProcReadState = toInt(getItem(currentProcAssetsIndex, 3))
     # Read item
+    if(toInt(getItem(currentProcAssetsIndex, 3))==1):
+        CitrusReadComponent(PTIMB[currentProcIP])
 
-    CitrusReadComponent(PTIMB[currentProcIP])
     processPointer += 1 
     if(processPointer > count):
         processPointer = 0
