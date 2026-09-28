@@ -1,7 +1,4 @@
-import pyglet
-from pyglet.window import key
-
-
+import sys
 #Definitions
 def SystemStart():
     global PTIMB
@@ -15,6 +12,10 @@ def SystemStart():
         
     global running
     running = True
+    
+def breakpoint(msg):
+    print(f"BREAKPOINT: {msg}")
+    sys.exit()
         
 def toString(number: int) -> str:
     #Converts an integer between 0 and 255 into an 8-bit binary string.  
@@ -53,9 +54,15 @@ def addItem(index: int, add: str): #Streamlined method for adding to a PTIMB arr
     indexPointer = toInt(PTIMB[index + 1]) + 1
     PTIMB[index+1] = toString(indexPointer)
     
-def getItem(source: int, index: int) -> int:
-    return PTIMB[source + 2 + index]
-    
+def getItem(sourceIndex: int, itemIndex: int) -> str:
+    return PTIMB[sourceIndex + 2 + itemIndex]
+
+def addEscInt(item, outpIndex):
+    if(item[0:2] != "c:"):
+        addItem(outpIndex, item)
+    else:
+        addItem(outpIndex, toString(int(item[2:len(item)+1])))
+                
 def splitString(input, delim, outpIndex):
     i = 0
     construct = ""
@@ -70,7 +77,9 @@ def splitString(input, delim, outpIndex):
         if(construct == delim):
             
             splitCount += 1
-            addItem(outpIndex, input[lastPoint:i])
+            outPut = input[lastPoint:i]
+            
+            addEscInt(outPut, outpIndex)
             
             lastPoint = i + 1
             construct = ""
@@ -79,7 +88,7 @@ def splitString(input, delim, outpIndex):
         i+=1
         
     if(splitCount >= 1):
-        addItem(outpIndex, input[lastPoint:len(input)])
+        addEscInt(input[lastPoint:len(input)], outpIndex)
         
 def CitrusReadComponent(byte):
     if len(byte) != byteSize:
@@ -104,39 +113,53 @@ def printRAM(start: int, finish: int):
         
 def loadProcess(code):
     # Asset Array Key:
-    # 1 - Code array address
-    # 2 - Stack array address
-    # 3 - Instruction Pointer
-    # 4 - Read state
+    # 0 - Code array address
+    # 1 - Stack array address
+    # 2 - Instruction Pointer
+    # 3 - Read state
     assetAddress = alloc(10) #Create asset array
     codeAddress = alloc(10) # Create container for the code to go in
     stackAddress = alloc(10) # Create stack array
     addItem(assetAddress, toString(codeAddress)) # Register code array as asset
     addItem(assetAddress, toString(stackAddress)) # Register Stack array as asset
-    addItem(assetAddress, toString(0)) # Instruction pointer asset
+    addItem(assetAddress, toString(codeAddress + 2)) # Instruction pointer asset
     addItem(assetAddress, toString(1)) # Read state asset
     splitString(code, "," , codeAddress) # Split code into code array
     addItem(processPTIMBaddress, toString(assetAddress)) # Register process after asset array is fully assembled
-
+    
+    
+# -- START RUNNING --
+ 
 # Initialize important variables for Processes
 processPTIMBaddress = 1
 PTIMB_AvaiableAddress = 0
-byteSize = 16
-#Start of program
+byteSize = 8
+
 SystemStart()
 
 # Where processes are registered to run
 newData(processPTIMBaddress,10)
 
-loadProcess(f"{toString(1)},{toString(2)}")
+loadProcess("c:1,c:2")
 
-# printRAM(0,100)
+# Print out a section of ram from beginning to 100 for debugging
+printRAM(0,100)
 
-instructionPointer = 0
-count = toInt(PTIMB[2])
+processPointer = 0
+count = toInt(PTIMB[processPTIMBaddress + 1])
 
-"""
-while(instructionPointer <= count):
-    CitrusReadComponent(getItem(1,instructionPointer))
-    instructionPointer += 1 """
+while(True):
+    #Find indexes & locations
+    currentProcAssetsIndex = toInt(getItem(processPTIMBaddress, processPointer))
+    currentProcCodeIndex = toInt(PTIMB[currentProcAssetsIndex + 2])
+    currentProcIP = toInt(getItem(currentProcAssetsIndex, 2))
+    
+    # Read item
+
+    CitrusReadComponent(PTIMB[currentProcIP])
+    processPointer += 1 
+    if(processPointer > count):
+        processPointer = 0
+    
+    breakpoint("Done")
     
