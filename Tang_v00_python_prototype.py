@@ -109,7 +109,19 @@ def printRAM(start: int, finish: int):
     for x in range(finish - start):
         print(f"{PTIMB[x]} ({toInt(PTIMB[x])})    -    [{i2}]")
         i2 += 1
+        
+def arithmetic(address, operation, term):
+    value = toInt(PTIMB[address])
+    if(operation == "*"):
+        result = value * term
+    elif(operation == "+"):
+        result = value + term
+    elif(operation == "-"):
+        result = value - term
+    elif(operation == "/"):
+        result = value/term
     
+    return(result)
         
 def loadProcess(code):
     # Asset Array Key:
@@ -141,12 +153,14 @@ SystemStart()
 newData(processPTIMBaddress,10)
 
 loadProcess("c:1,c:2")
+loadProcess("c:1,c:2")
 
 # Print out a section of ram from beginning to 100 for debugging
 printRAM(0,100)
 
 processPointer = 0
 count = toInt(PTIMB[processPTIMBaddress + 1])
+print("DEBUG " + str(count))
 
 for x in range(3):
     #Find indexes & locations
@@ -162,7 +176,6 @@ for x in range(3):
         addItem(currentProcStackAddress, PTIMB[currentProcIP])
     
     #Increase insruction pointer
-    print(f"DEBUG: {}")
     processPointer += 1 
     if(processPointer > count):
         processPointer = 0
