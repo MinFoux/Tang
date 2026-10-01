@@ -1,5 +1,7 @@
+DISCLAIMER: Although some of the ideas here still remain for the Python edition of Tang, this document was for the Scratch version, and is not entirely accurate.
+
 Functions candidate 1
-Have a system of 4 parallel lists to describe any component. (The currently imoplemented system of identifying a component's data only uses 2 lists)
+Have a system of 4 parallel lists to describe any component. (The currently implemented system of identifying a component's data only uses 2 lists)
 These 4 lists would be:
 * Component Name "parent.name" or just ".name" if no parent.
 * Component argument count: the amount of arguments the component needs to function.
