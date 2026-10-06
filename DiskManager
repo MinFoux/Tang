@@ -69,7 +69,8 @@ def consume(statement, values):
             print(f"User wants {values[0]} to be initialized as {values[1]}")
             
             if(values[0] in construct.keys()):  
-                PLACEHOLDER()
+                raise ValueError("Initialize (init) can only change existing values.")
+                
                 # Throw error because init should only create, not change values. 
             else:
                 construct[values[0]] = values[1]
@@ -88,7 +89,8 @@ def consume(statement, values):
                 # This one creates a new one
                 
             else:
-                PLACEHOLDER()
+                
+                raise ValueError("Format (fort) can only change existing values.")
                 # Throw error because fort should only change, not create values. 
                 
     return args
