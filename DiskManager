@@ -60,24 +60,37 @@ def consume(statement, values):
 
             print(f"User wants {values[0]} to be initialized as {values[1]}")
             construct[values[0]] = values[1]
+            construct[values[0]+"_size"] = 1024
             disk_file = open(values[1], "wb")
             data = b'\x00'*1024
             disk_file.write(data)
 
         else:
             print(f"User wants {values[0]} to be initialized as {values[1]}")
-            construct[values[0]] = values[1]
-            if(values[0] in construct.keys()):
+            
+            if(values[0] in construct.keys()):  
                 PLACEHOLDER()
-                # Be able to change the data of an item
-                # Be able to change the format of a disk to any size
-                # Other format stuff you know
+                # Throw error because init should only create, not change values. 
+            else:
+                construct[values[0]] = values[1]
+                # This one creates a new one
             
             
             
         
     elif(statement == "fort"): #"fort" is short for "Format", I know it doesn't make any sense but bear with me here
-        print(f"User wants {values[0]} to be formatted  as {values[1]}")
+        if(key == "diskFormat"):
+            PLACEHOLDER
+        else:
+            print(f"User wants {values[0]} to be formatted  as {values[1]}")
+            if(values[0] in construct.keys()):  
+                construct[values[0]] = values[1]
+                # This one creates a new one
+                
+            else:
+                PLACEHOLDER()
+                # Throw error because fort should only change, not create values. 
+                
     return args
 
 def findParts(input):
