@@ -1,0 +1,97 @@
+varnames = []
+varvals = []   
+
+def PLACEHOLDER():
+    #Pretend im doing nothing
+    pass
+
+def splitString(input, delim):
+    i = 0
+    construct = ""
+    lastPoint = 0
+    splitCount = 0
+    split = []
+    while(i <= len(input) - 1):
+        if(len(delim) + i <= len(input)):
+            construct = input[i:i+len(delim)]
+        else:
+            i = len(input) - 2
+                
+        if(construct == delim):
+            
+            splitCount += 1
+            outPut = input[lastPoint:i]
+            
+            split.append(outPut)
+
+            lastPoint = i + 1
+            construct = ""
+            i += len(delim) - 1
+        
+        i+=1
+        
+    if(splitCount >= 1):
+        split.append(input[lastPoint:len(input)])
+
+    return split
+
+def getKeyword(input):
+    keyword = ""
+    for i in range(len(input)):
+        if(input[i] == ':'):
+            break
+        keyword += input[i]
+    return keyword
+
+def consume(statement, values):
+    args = []
+    secondVal = values[1]
+    key = getKeyword(values[0])
+    tempVal = values[0]
+    tempVal = tempVal[len(key)+1:len(tempVal)]
+    if(tempVal != ""):
+        values[0] = tempVal
+
+    args.append(secondVal[len(key)+1:secondVal.find('=')])
+    args.append(secondVal[secondVal.find('=') + 1:len(secondVal)])
+
+    if(statement == "init"):
+        #The user wants to initialize something
+        if(key == "Disk"):
+
+            print(f"User wants {values[0]} to be initialized as {values[1]}")
+
+        else:
+            print(f"User wants {values[0]} to be initialized as {values[1]}")
+            
+        
+    elif(statement == "fort"): #"fort" is short for "Format", I know it doesn't make any sense but bear with me here
+        print(f"User wants {values[0]} to be formatted  as {values[1]}")
+    return args
+
+def findParts(input):
+    parts = []
+    for i in range(len(input)):
+        if(input[i] == '{'):
+            parts.append(input[:i])
+            break
+    parts.append(input[i+1:len(input)-1])
+    return parts
+
+# Start
+
+with open("TangDisk\\TangDiskSettings.cfg","r") as get_file:
+    file_content = get_file.read()
+
+args = splitString(file_content, "\n")
+
+for arg in args:
+    # Get rid of spaces
+    arg = arg.replace(" ", "")
+    # Get the main of argument
+    parts = findParts(arg)
+    # Get the secondary of argument
+    values = splitString(parts[1], "=")
+    consume(parts[0], values)
+
+# Next step: Create the disk file (.mem) with the provided name, and pass data to Tang via JSON
