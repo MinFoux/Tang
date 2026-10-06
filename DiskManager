@@ -1,5 +1,4 @@
-varnames = []
-varvals = []   
+construct = {}
 
 def PLACEHOLDER():
     #Pretend im doing nothing
@@ -60,9 +59,21 @@ def consume(statement, values):
         if(key == "Disk"):
 
             print(f"User wants {values[0]} to be initialized as {values[1]}")
+            construct[values[0]] = values[1]
+            disk_file = open(values[1], "wb")
+            data = b'\x00'*1024
+            disk_file.write(data)
 
         else:
             print(f"User wants {values[0]} to be initialized as {values[1]}")
+            construct[values[0]] = values[1]
+            if(values[0] in construct.keys()):
+                PLACEHOLDER()
+                # Be able to change the data of an item
+                # Be able to change the format of a disk to any size
+                # Other format stuff you know
+            
+            
             
         
     elif(statement == "fort"): #"fort" is short for "Format", I know it doesn't make any sense but bear with me here
@@ -94,4 +105,10 @@ for arg in args:
     values = splitString(parts[1], "=")
     consume(parts[0], values)
 
+print(construct)
 # Next step: Create the disk file (.mem) with the provided name, and pass data to Tang via JSON
+# Stop splitting by newlines, instead, maybe something more sphisticated/structured.
+# Instead of needing to start many init/fort statements, allow for initializing multiple disks/formats in a single statement.
+# e. g. init{Disk: Disk_1 = TangDisk/TangDisk.mem, Disk_2 = TangDisk/TangDisk2.mem};
+# e. g. fort{Disk_1 = TangDisk/TangDisk.mem, Disk_2 = TangDisk/TangDisk2.mem};
+# Automatically create formats when disk is created, so that they can be changed later. Formats include disk size, if it's encrypted, etc. because I can't think of anything else at the moment.
