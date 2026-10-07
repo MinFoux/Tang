@@ -64,28 +64,40 @@ def consume(statement, values):
             disk_file = open(values[1], "wb")
             data = b'\x00'*1024
             disk_file.write(data)
+            val1 = values[0]
 
         else:
             print(f"User wants {values[0]} to be initialized as {values[1]}")
+            
             
             if(values[0] in construct.keys()):  
                 raise ValueError("Initialize (init) can only change existing values.")
                 
                 # Throw error because init should only create, not change values. 
             else:
-                construct[values[0]] = values[1]
+                construct[val1] = values[1]
+                    
+                    
                 # This one creates a new one
             
             
             
         
     elif(statement == "fort"): #"fort" is short for "Format", I know it doesn't make any sense but bear with me here
+        val1 = values[0]
         if(key == "diskFormat"):
             PLACEHOLDER
         else:
             print(f"User wants {values[0]} to be formatted  as {values[1]}")
             if(values[0] in construct.keys()):  
                 construct[values[0]] = values[1]
+                lengVal1 = len(val1)
+                if(val1[lengVal1-len("_size"):lengVal1] == "_size"):
+
+                    #Opens up the file the 
+                    disk_file = open(construct[values[0]], "wb")
+                    data = b'\x00'*values[1]
+                    disk_file.write(data)
                 # This one creates a new one
                 
             else:
