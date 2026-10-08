@@ -1,22 +1,22 @@
 import sys
 import json
 #Definitions
-def SystemStart():
-    global PTIMB
-    PTIMB = []
-    global PTIMB_Size
-    global maxByteAmount
-    maxByteAmount = toInt("1"*byteSize)
-    PTIMB_Size = maxByteAmount
-    for x in range(PTIMB_Size):
-        PTIMB.append("0"*byteSize)
-        
-    global running
-    running = True
-    
+
 def breakpoint(msg):
     print(f"BREAKPOINT: {msg}")
     sys.exit()
+
+def SystemStart():
+    global PTIMB
+    
+    global PTIMB_Size
+    global maxByteAmount
+    maxByteAmount = toInt("1"*byteSize, "string")
+    PTIMB_Size = maxByteAmount
+    PTIMB = bytearray(PTIMB_Size)
+    global running
+    running = True
+        
         
 def toString(number: int) -> str:
     #Converts an integer between 0 and 255 into an 8-bit binary string.  
@@ -25,39 +25,41 @@ def toString(number: int) -> str:
         
     return f"{number:0{byteSize}b}"
     
-def toInt(bit_string: str) -> int:
+def toInt(bit_string, mode = "pass"):
     #Turns an 8-bit binary string into an integer.
-    if(type(bit_string) == str):
-        if(len(bit_string) != byteSize):
-            raise ValueError(f"The input string must be exactly {byteSize} bits long.\n     The provided input is {len(bit_string)} bits long. ({bit_string})")
-    else:
-        raise ValueError("toInt requires a bit string as input.")
 
-        
-    return int(bit_string, 2)
+    if(mode == "string"):
+        if(type(bit_string) == str):
+            if(len(bit_string) != byteSize):
+                raise ValueError(f"The input string must be exactly {byteSize} bits long.\n     The provided input is {len(bit_string)} bits long. ({bit_string})")
+        else:
+            raise ValueError("toInt requires a bit string as input.")
+
+        return int(bit_string, 2)
+    elif(mode == "pass"):
+        return bit_string
 
 def newData(index, length):
-    if(PTIMB[index] != "0"*byteSize):
+    if(PTIMB[index] != 0):
         raise ValueError("PTIMB space is occupied")
-    PTIMB[index] = toString(length + index + 2)
-    PTIMB[index + 1] = "0"*byteSize
-    PTIMB[index + length + 2] = toString(index)
-    PTIMB[PTIMB_AvaiableAddress] = toString(index + length + 3)
+    PTIMB[index] = length + index + 2
+    PTIMB[index + 1] = 0
+    PTIMB[index + length + 2] = index
+    PTIMB[PTIMB_AvaiableAddress] = index + length + 3
 
 def insertItem(indexOfData, atPos, inject): #The index of the Array, what you are injecting, and where in the array you want it to go.
-    if len(inject) != byteSize:
-        raise ValueError(f"The input string must be exactly {byteSize} bits long.")
-    if(toInt(PTIMB[toInt(PTIMB[indexOfData])]) != indexOfData):
+    if(PTIMB[PTIMB[indexOfData]] != indexOfData):
         raise ValueError("Selected PTIMB is not closed.")
-    if(toInt(PTIMB[indexOfData])<=atPos + indexOfData):
+    if(PTIMB[indexOfData] <= atPos + indexOfData):
         raise ValueError("PTIMB is not long enough to contain data at specified index.")
-
     PTIMB[indexOfData + 2 + atPos] = inject
-   
+    if(PTIMB[indexOfData + 2 + atPos] != inject):
+        raise ValueError("Failed to insert item.")
+
 def addItem(index: int, add: str): #Streamlined method for adding to a PTIMB array.
     insertItem(index, toInt(PTIMB[index + 1]), add)
     indexPointer = toInt(PTIMB[index + 1]) + 1
-    PTIMB[index+1] = toString(indexPointer)
+    PTIMB[index+1] = indexPointer
 
 def getIndex(sourceIndex: int, itemIndex: int) -> str:
     if not isinstance(sourceIndex, int) or not isinstance(itemIndex, int):
@@ -95,22 +97,16 @@ def getItem(sourceIndex: int, itemIndex: int) -> str:
         )
 
     result1 = PTIMB[targetIndex]
-    if (type(result1) != str):
+    if (type(result1) != int):
         printRAM(0,100)
-        raise ValueError(f"Memory has been dummped;\nPTIMB entry at index {targetIndex} is not a bit string: {result1!r}")
-    if len(result1) != byteSize:
-        raise ValueError(
-            f"PTIMB entry at index {targetIndex} must be exactly {byteSize} bits long; "
-            f"got {len(result1)} bits ({result1})"
-        )
+        raise ValueError(f"Memory has been dummped;\nPTIMB entry at index {targetIndex} is not a bit integer: {result1!r}")
 
     return result1
 
 def addEscInt(item, outpIndex):
-    if(item[0:2] != "c:"):
-        addItem(outpIndex, item)
-    else:
-        addItem(outpIndex, toString(int(item[2:len(item)+1])))
+    result = item[2:len(item)+1]
+    if(result != ""):
+        addItem(outpIndex, int(item))
                 
 def splitString(input, delim, outpIndex):
     i = 0
@@ -139,31 +135,28 @@ def splitString(input, delim, outpIndex):
     if(splitCount >= 1):
         addEscInt(input[lastPoint:len(input)], outpIndex)
         
-def CitrusReadComponent(byte):
+def CitrusReadComponent(byte: int):
     if(currentProcReadState == 1):
-        if len(byte) != byteSize:
-            raise ValueError(f"The input string must be exactly {byteSize} bits long.")
-        if(byte == toString(1)): #Debug
+        if(byte == 1): #Debug
             print("Component read successfully")
                     
-        if(byte == toString(2)): #Get Interpreter
+        if(byte == 2): #Get Interpreter
             print("The current interpreter is Citrus")
             
-        if(byte == toString(3)): #PUSH
-            PTIMB[currentProcReadStateAddress] = toString(2)
+        if(byte == 3): #PUSH
+            breakpoint("PUSH reached")
+            PTIMB[currentProcReadStateAddress] = 2
 
-        if(byte == toString(4)): #POP
-            PTIMB[currentProcStackAddress + 1 + toInt(PTIMB[currentProcStackAddress + 1])] = "0"*byteSize
-            PTIMB[currentProcStackAddress + 1] = toString(toInt(PTIMB[currentProcStackAddress + 1]) - 1)
+        if(byte == 4): #POP
+            PTIMB[currentProcStackAddress + 1 + PTIMB[currentProcStackAddress + 1]] = 0
+            PTIMB[currentProcStackAddress + 1] = PTIMB[currentProcStackAddress + 1] - 1
 
     elif(currentProcReadState == 2):
         addItem(currentProcStackAddress, byte)
         print(f"DEBUG: Added {byte} to stack at address {currentProcStackAddress}")
-        arithmetic(currentProcReadStateAddress, "=", 1, "write")
-
+        PTIMB[currentProcReadStateAddress] = 1
     
-        
-def alloc(length):
+def alloc(length: int):
     indexof = toInt(PTIMB[PTIMB_AvaiableAddress])   
     newData(toInt(PTIMB[PTIMB_AvaiableAddress]), length)
     return(indexof)
@@ -172,21 +165,21 @@ def printRAM(start: int, finish: int, mode = "string"):
     i2 = start
     if(mode == "string"):
         for x in range(finish - start):
-            if(type(PTIMB[x]) != str):
-                print(f"{PTIMB[x]} ({PTIMB[x]})    -    [{i2}] <------ WARNING: Not a bit string")
+            if(type(PTIMB[x]) != int):
+                print(f"{PTIMB[x]}    -    [{i2}] <------ WARNING: Not a bit")
             else:
-                print(f"{PTIMB[x]} ({toInt(PTIMB[x])})    -    [{i2}]")
+                print(f"{PTIMB[x]}    -    [{i2}]")
             i2 += 1
     elif(mode == "int"):
         for x in range(finish - start):
-            if(type(PTIMB[x]) == str):
-                print(f"{toInt(PTIMB[x])}    -    [{i2}]")
+            if(type(PTIMB[x]) == int):
+                print(f"{PTIMB[x]}    -    [{i2}]")
             else:
-                print(f"{PTIMB[x]}    -    [{i2}] <------ WARNING: Not a bit string")
+                print(f"{PTIMB[x]}    -    [{i2}] <------ WARNING: Not a bit")
             i2 += 1
         
 def arithmetic(address: int, operation: str, term: int, mode: str = "noWrite"):
-    value = toInt(PTIMB[address])
+    value = PTIMB[address]
     if(operation == "*"):
         result = value * term
     elif(operation == "+"):
@@ -201,8 +194,8 @@ def arithmetic(address: int, operation: str, term: int, mode: str = "noWrite"):
     if(mode == "noWrite"):
         return(result)
     elif(mode == "write"):
-        PTIMB[address] = toString(result)
-        if(type(PTIMB[address]) != str ):
+        PTIMB[address] = result
+        if(type(PTIMB[address]) != int ):
             print(f"WARNING: Incorrect type assignment put to address {address}")
         return(result)
     
@@ -217,12 +210,12 @@ def loadProcess(code):
     assetAddress = alloc(10) #Create asset array
     codeAddress = alloc(10) # Create container for the code to go in
     stackAddress = alloc(10) # Create stack array
-    addItem(assetAddress, toString(codeAddress)) # Register code array as asset
-    addItem(assetAddress, toString(stackAddress)) # Register Stack array as asset
-    addItem(assetAddress, toString(codeAddress + 2)) # Instruction pointer asset
-    addItem(assetAddress, toString(1)) # Read state asset
+    addItem(assetAddress, codeAddress) # Register code array as asset
+    addItem(assetAddress, stackAddress) # Register Stack array as asset
+    addItem(assetAddress, codeAddress + 2) # Instruction pointer asset
+    addItem(assetAddress, 1) # Read state asset
     splitString(code, "," , codeAddress) # Split code into code array
-    addItem(processPTIMBaddress, toString(assetAddress)) # Register process after asset array is fully assembled
+    addItem(processPTIMBaddress, assetAddress) # Register process after asset array is fully assembled
     
     
 # -- START RUNNING --
@@ -237,7 +230,7 @@ SystemStart()
 # Where processes are registered to run
 newData(processPTIMBaddress,10)
 
-loadProcess("c:3,c:100,c:4,c:3,c:66")
+loadProcess("1,2,3,100,3,66")
 
 # Print out a section of ram from beginning to 100 for debugging
 
@@ -255,13 +248,13 @@ for x in range(5):
     currentProcStackAddress = toInt(getItem(currentProcAssetsIndex, 1))
     currentProcReadState = toInt(getItem(currentProcAssetsIndex, 3))
     currentProcReadStateAddress = getIndex(currentProcAssetsIndex, 3)
-    #print(f"DEBUG: Assets Index: {currentProcAssetsIndex}, Code Index: {currentProcCodeIndex}, IP Address: {currentProcIPaddress}, Read State Address: {currentProcReadStateAddress}, Stack Address: {currentProcStackAddress}")
+    print(f"DEBUG: Assets Index: {currentProcAssetsIndex}, Code Index: {currentProcCodeIndex}, IP Address: {currentProcIPaddress}, Read State Address: {currentProcReadStateAddress}, Stack Address: {currentProcStackAddress}")
 
     # Read item
     CitrusReadComponent(PTIMB[currentProcIP])
     arithmetic(currentProcIPaddress, "+", 1, "write")
-    #print(f"DEBUG: {currentProcReadState == toInt(PTIMB[currentProcReadStateAddress])}, the value is {toInt(PTIMB[currentProcReadStateAddress])} and {currentProcReadState}")
-    #print(f"DEBUG: Instruction pointer: {currentProcIP}")
+    print(f"DEBUG: {currentProcReadState == toInt(PTIMB[currentProcReadStateAddress])}, the value is {toInt(PTIMB[currentProcReadStateAddress])} and {currentProcReadState}")
+    print(f"DEBUG: Instruction pointer: {currentProcIP}")
 
     #Increase insruction pointer
     processPointer += 1 

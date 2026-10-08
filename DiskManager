@@ -1,4 +1,5 @@
 construct = {}
+construct["Default"] = "NONE"
 
 def PLACEHOLDER():
     #Pretend im doing nothing
