@@ -2,23 +2,27 @@ import sys
 import json
 #Definitions
 
-def breakpoint(msg):
-    print(f"BREAKPOINT: {msg}")
-    sys.exit()
-
 def SystemStart():
+    # Init globals
     global PTIMB
-    
     global PTIMB_Size
     global maxByteAmount
-    maxByteAmount = toInt("1"*byteSize, "string")
-    PTIMB_Size = maxByteAmount
-    PTIMB = bytearray(PTIMB_Size)
     global running
+    maxByteAmount = toInt("1"*byteSize, "string") # Decides how long PTIMB should be
+    PTIMB_Size = maxByteAmount
+    PTIMB = bytearray(PTIMB_Size) # Thus it begins
     running = True
-        
-        
+
+def breakpoint(msg: str, mode: str = "non-fatal"):
+    if mode == "fatal":
+        print(f"FATAL BREAKPOINT: {msg}")
+        sys.exit()
+    else:
+        print(f"BREAKPOINT: {msg}")
+        running = False
+             
 def toString(number: int) -> str:
+    # Mostly obsolete
     #Converts an integer between 0 and 255 into an 8-bit binary string.  
     if not (0 <= number <= maxByteAmount):
         raise ValueError(f"Number must be between 0 and {maxByteAmount} for an 8-bit byte.")
@@ -27,7 +31,7 @@ def toString(number: int) -> str:
     
 def toInt(bit_string, mode = "pass"):
     #Turns an 8-bit binary string into an integer.
-
+    # Mostly obsolete
     if(mode == "string"):
         if(type(bit_string) == str):
             if(len(bit_string) != byteSize):
@@ -39,13 +43,13 @@ def toInt(bit_string, mode = "pass"):
     elif(mode == "pass"):
         return bit_string
 
-def newData(index, length):
+def newData(index, length): # Primitive for making a new array
     if(PTIMB[index] != 0):
         raise ValueError("PTIMB space is occupied")
-    PTIMB[index] = length + index + 2
-    PTIMB[index + 1] = 0
-    PTIMB[index + length + 2] = index
-    PTIMB[PTIMB_AvaiableAddress] = index + length + 3
+    PTIMB[index] = length + index + 2 # Place start cap
+    PTIMB[index + 1] = 0 # Initialize the data pointer
+    PTIMB[index + length + 2] = index # Place end cap
+    PTIMB[PTIMB_AvaiableAddress] = index + length + 3 # Update the available address
 
 def insertItem(indexOfData, atPos, inject): #The index of the Array, what you are injecting, and where in the array you want it to go.
     if(PTIMB[PTIMB[indexOfData]] != indexOfData):
@@ -56,8 +60,9 @@ def insertItem(indexOfData, atPos, inject): #The index of the Array, what you ar
     if(PTIMB[indexOfData + 2 + atPos] != inject):
         raise ValueError("Failed to insert item.")
 
-def addItem(index: int, add: str): #Streamlined method for adding to a PTIMB array.
-    insertItem(index, toInt(PTIMB[index + 1]), add)
+def addItem(index: int, add: int): #Streamlined method for adding to a PTIMB array.
+    insertItem(index, PTIMB[index + 1], add)
+    #print(f"DEBUG: Added {add} to stack at address {index + 1}")
     indexPointer = toInt(PTIMB[index + 1]) + 1
     PTIMB[index+1] = indexPointer
 
@@ -81,8 +86,7 @@ def getItem(sourceIndex: int, itemIndex: int) -> str:
 
     PTIMB entries are arranged as:
       [0] length/metadata
-      [1] cursor/next-write index
-      [2:] data bytes
+      [1:] data bytes
     This helper resolves the item offset relative to a data block and validates
     that the target is a valid byte-sized binary string.
     """
@@ -104,39 +108,36 @@ def getItem(sourceIndex: int, itemIndex: int) -> str:
     return result1
 
 def addEscInt(item, outpIndex):
-    result = item[2:len(item)+1]
+    
+    result = int(item)
     if(result != ""):
-        addItem(outpIndex, int(item))
+        addItem(outpIndex, result)
                 
-def splitString(input, delim, outpIndex):
-    i = 0
-    construct = ""
+def splitString(text, delim, outpIndex=None, mode: str = "PTIMB"): # Where the magic happens
+    pieces = []
     lastPoint = 0
-    splitCount = 0
-    while(i <= len(input) - 1):
-        if(len(delim) + i <= len(input)):
-            construct = input[i:i+len(delim)]
+    i = 0
+    n, d = len(text), len(delim)
+
+    while i <= n - d:
+        if text[i:i+d] == delim:
+            pieces.append(text[lastPoint:i])
+            i += d
+            lastPoint = i
         else:
-            i = len(input) - 2
-                
-        if(construct == delim):
-            
-            splitCount += 1
-            outPut = input[lastPoint:i]
-            
-            addEscInt(outPut, outpIndex)
-            
-            lastPoint = i + 1
-            construct = ""
-            i += len(delim) - 1
-        
-        i+=1
-        
-    if(splitCount >= 1):
-        addEscInt(input[lastPoint:len(input)], outpIndex)
+            i += 1
+
+    pieces.append(text[lastPoint:])  # remainder (or whole string if no delim)
+
+    if mode == "array":
+        return pieces
+    elif mode == "PTIMB":
+        for p in pieces:
+            addEscInt(p, outpIndex)
         
 def CitrusReadComponent(byte: int):
-    if(currentProcReadState == 1):
+    
+    if(PTIMB[currentProcReadStateAddress] == 1):
         if(byte == 1): #Debug
             print("Component read successfully")
                     
@@ -144,18 +145,16 @@ def CitrusReadComponent(byte: int):
             print("The current interpreter is Citrus")
             
         if(byte == 3): #PUSH
-            breakpoint("PUSH reached")
             PTIMB[currentProcReadStateAddress] = 2
 
         if(byte == 4): #POP
-            PTIMB[currentProcStackAddress + 1 + PTIMB[currentProcStackAddress + 1]] = 0
-            PTIMB[currentProcStackAddress + 1] = PTIMB[currentProcStackAddress + 1] - 1
+            PTIMB[currentProcStackAddress + 1 + PTIMB[currentProcStackAddress + 1]] = 0 # Replace top of stack with 0
+            PTIMB[currentProcStackAddress + 1] = PTIMB[currentProcStackAddress + 1] - 1 # Tell the stack pointer to move down
 
-    elif(currentProcReadState == 2):
-        addItem(currentProcStackAddress, byte)
-        print(f"DEBUG: Added {byte} to stack at address {currentProcStackAddress}")
-        PTIMB[currentProcReadStateAddress] = 1
-    
+    elif(PTIMB[currentProcReadStateAddress] == 2): # Push
+        addItem(currentProcStackAddress, byte) # Add the byte to the stack
+        PTIMB[currentProcReadStateAddress] = 1 # Return to read state
+
 def alloc(length: int):
     indexof = toInt(PTIMB[PTIMB_AvaiableAddress])   
     newData(toInt(PTIMB[PTIMB_AvaiableAddress]), length)
@@ -179,6 +178,7 @@ def printRAM(start: int, finish: int, mode = "string"):
             i2 += 1
         
 def arithmetic(address: int, operation: str, term: int, mode: str = "noWrite"):
+    
     value = PTIMB[address]
     if(operation == "*"):
         result = value * term
@@ -200,7 +200,18 @@ def arithmetic(address: int, operation: str, term: int, mode: str = "noWrite"):
         return(result)
     
     return(result)
-        
+
+def purgeArray(address: int):
+    if(PTIMB[address] != 0): #Check if address is empty
+        if(PTIMB[PTIMB[address]] == address): #Check if address is a closed loop
+            for i in range(PTIMB[address+1]):
+                PTIMB[PTIMB[address] + i + 1] = 0
+            PTIMB[PTIMB[address]] = 0
+            PTIMB[address] = 0
+            
+        else:
+            breakpoint("Cannot purge a non-existent array","fatal")
+
 def loadProcess(code):
     # Asset Array Key:
     # 0 - Code array address
@@ -217,7 +228,32 @@ def loadProcess(code):
     splitString(code, "," , codeAddress) # Split code into code array
     addItem(processPTIMBaddress, assetAddress) # Register process after asset array is fully assembled
     
-    
+def CitrusTranslate(program: str):
+    # Translate the program into a format suitable for execution
+    args = splitString(program[1:len(program)-1], "][",0, "array")
+    buildProgram = ""
+    argIndex = 0
+    for arg in args:
+        argIndex += 1
+        # Process each argument
+        match arg:
+            case "DEBUG":
+                buildProgram += "1"
+            case "TEST":
+                buildProgram += "2"
+            case "PUSH":
+                buildProgram += "3"
+            case "POP":
+                buildProgram += "4"
+            case _:
+                buildProgram += str(int(arg))
+        if(argIndex < len(args)):
+            buildProgram += ","
+
+    return buildProgram
+
+
+
 # -- START RUNNING --
  
 # Initialize important variables for Processes
@@ -230,7 +266,9 @@ SystemStart()
 # Where processes are registered to run
 newData(processPTIMBaddress,10)
 
-loadProcess("1,2,3,100,3,66")
+loadProcess(CitrusTranslate("[PUSH][204][PUSH][255][PUSH][255]"))
+
+#loadProcess("1,2,3,100,3,66")
 
 # Print out a section of ram from beginning to 100 for debugging
 
@@ -239,7 +277,7 @@ processPointer = 0
 count = toInt(PTIMB[processPTIMBaddress + 1]) - 1
 #print("DEBUG " + str(count))
 
-for x in range(5):
+for x in range(6):
     #Find indexes & locations, while updating changed data.
     currentProcAssetsIndex = toInt(getItem(processPTIMBaddress, processPointer))
     currentProcCodeIndex = getIndex(currentProcAssetsIndex, 0)
@@ -248,17 +286,20 @@ for x in range(5):
     currentProcStackAddress = toInt(getItem(currentProcAssetsIndex, 1))
     currentProcReadState = toInt(getItem(currentProcAssetsIndex, 3))
     currentProcReadStateAddress = getIndex(currentProcAssetsIndex, 3)
-    print(f"DEBUG: Assets Index: {currentProcAssetsIndex}, Code Index: {currentProcCodeIndex}, IP Address: {currentProcIPaddress}, Read State Address: {currentProcReadStateAddress}, Stack Address: {currentProcStackAddress}")
+    #print(f"DEBUG: Assets Index: {currentProcAssetsIndex}, Code Index: {currentProcCodeIndex}, IP Address: {currentProcIPaddress}, Read State Address: {currentProcReadStateAddress}, Stack Address: {currentProcStackAddress}")
 
     # Read item
     CitrusReadComponent(PTIMB[currentProcIP])
     arithmetic(currentProcIPaddress, "+", 1, "write")
-    print(f"DEBUG: {currentProcReadState == toInt(PTIMB[currentProcReadStateAddress])}, the value is {toInt(PTIMB[currentProcReadStateAddress])} and {currentProcReadState}")
-    print(f"DEBUG: Instruction pointer: {currentProcIP}")
+    #print(f"DEBUG: {currentProcReadState == toInt(PTIMB[currentProcReadStateAddress])}, the value is {toInt(PTIMB[currentProcReadStateAddress])} and {currentProcReadState}")
+    #print(f"DEBUG: Instruction pointer: {currentProcIP}")
 
     #Increase insruction pointer
     processPointer += 1 
     if(processPointer > count):
         processPointer = 0
 
+printRAM(0,100)
+print("Purging array...")
+purgeArray(40)
 printRAM(0,100)
