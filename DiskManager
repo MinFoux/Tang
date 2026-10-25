@@ -7,14 +7,6 @@ construct["Default"] = "NONE"
 construct["Image"] = "NONE"
 print(" - Disk Manager started - ")
 
-def breakpoint(msg):
-    print(f"BREAKPOINT: {msg}")
-    sys.exit()
-
-def PLACEHOLDER():
-    #Pretend im doing nothing
-    pass
-
 def splitString(input, delim):
     i = 0
     construct = ""

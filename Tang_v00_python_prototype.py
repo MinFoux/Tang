@@ -1,5 +1,10 @@
 import sys
 import json
+import tacoin
+import mint
+import pygame
+
+mint.PLACEHOLDER() # Just keep mint in mind (Super placeholder)
 #Definitions
 
 def SystemStart():
@@ -22,12 +27,18 @@ def breakpoint(msg: str, mode: str = "non-fatal"):
         running = False
              
 def toString(number: int) -> str:
+
     # Mostly obsolete
     #Converts an integer between 0 and 255 into an 8-bit binary string.  
     if not (0 <= number <= maxByteAmount):
         raise ValueError(f"Number must be between 0 and {maxByteAmount} for an 8-bit byte.")
         
     return f"{number:0{byteSize}b}"
+
+def endTang():
+    pygame.display.quit()
+    pygame.quit()
+    sys.exit()
     
 def toInt(bit_string, mode = "pass"):
     #Turns an 8-bit binary string into an integer.
@@ -252,8 +263,6 @@ def CitrusTranslate(program: str):
 
     return buildProgram
 
-
-
 # -- START RUNNING --
  
 # Initialize important variables for Processes
@@ -303,3 +312,12 @@ printRAM(0,100)
 print("Purging array...")
 purgeArray(40)
 printRAM(0,100)
+
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_c:
+                if pygame.key.get_mods() & pygame.KMOD_CTRL:
+                    endTang()
+    tacoin.render("Hello, World!")
+    pass
