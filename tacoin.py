@@ -1,11 +1,6 @@
 import pygame
 import mint
 
-mint.PLACEHOLDER() # Just keep mint in mind (Super placeholder)
-character_hex = "x00"
-Octets = mint.octets # Import character data from mint
-octDict = mint.octetDictionary # Import character dictionary from mint
-
 def loadChar(hexIn):
     CHAR = []
     index = get_char_index(hexIn)
@@ -66,23 +61,66 @@ def draw_character(character, x, y, PIXEL_SIZE=1):
 def charToHex(char):
     return octDict.get(char, "x00")
 
-def render(input_list):
-    screen.fill((0, 0, 0))            
-      # Load character data for "A"
+def pgHome():
+    screen.fill((0, 0, 0))
+        
+    global screenX, screenY
     screenX = 0
-    screenY = 0
+    screenY = 0  
 
+def render(input_list):
+    global screenX, screenY
     for i in input_list:
-        draw_character(loadChar(charToHex(i)), screenX, screenY, 2)
+        draw_character(loadChar(charToHex(i)), screenX, screenY, textSize)
         screenX += 16
 
-    pygame.display.flip()
+def renderln(input_list):
+    global screenX, screenY
+    screenX = 0
+    screenY += 16
+    render(input_list)
 
-# Start pygame and make it look nice.
+def renderList(input_list):
+    global resHeight
+    global resWidth
+    fit = int(resHeight/(textSize * 8))
+    printingRange = len(input_list) - fit
+    index = printingRange
+    if(index < 0):
+        index = 0
+    if(fit > len(input_list)):
+        fit = len(input_list)
+    for i in range(fit):
+        if (i == 0):
+            render(str(input_list[index + i]))
+        else:
+            renderln(str(input_list[index + i]))
 
-pygame.init()
 
-screen = pygame.display.set_mode((1280, 720))
-gameIcon = pygame.image.load('D:\\icons\\TangCommandInterfaceIcon.ico')
-pygame.display.set_icon(gameIcon)
-pygame.display.set_caption("TACOIN")
+
+def start():
+    global screenX
+    global screenY
+    global character_hex
+    global Octets
+    global octDict
+    global screen
+    global resHeight
+    global resWidth
+    global textSize
+    
+    textSize = 2
+    resHeight = 720
+    resWidth = 1280
+    screenX = 0
+    screenY = 0
+    character_hex = "x00"
+    Octets = mint.octets # Import character data from mint
+    octDict = mint.octetDictionary # Import character dictionary from mint
+
+    # Start pygame and make it look nice.
+    pygame.init()
+    screen = pygame.display.set_mode((resWidth, resHeight))
+    gameIcon = pygame.image.load('D:\\icons\\TangCommandInterfaceIcon.ico')
+    pygame.display.set_icon(gameIcon)
+    pygame.display.set_caption("TACOIN")

@@ -13,11 +13,24 @@ def SystemStart():
     global PTIMB_Size
     global maxByteAmount
     global running
+    global talkbox
+    global byteSize
+    global PTIMB_AvaiableAddress
+    global processPTIMBaddress
+    global Display
+    global processPointer
+
+    processPTIMBaddress = 1
+    PTIMB_AvaiableAddress = 0
+    byteSize = 16
+    Display = []
     maxByteAmount = toInt("1"*byteSize, "string") # Decides how long PTIMB should be
     PTIMB_Size = maxByteAmount
     PTIMB = bytearray(PTIMB_Size) # Thus it begins
     running = True
-
+    talkbox = ""
+    processPointer = 0
+    
 def breakpoint(msg: str, mode: str = "non-fatal"):
     if mode == "fatal":
         print(f"FATAL BREAKPOINT: {msg}")
@@ -118,6 +131,24 @@ def getItem(sourceIndex: int, itemIndex: int) -> str:
 
     return result1
 
+def getArrLen(address: int):
+    if(PTIMB[address] != 0): #Check if address is empty
+            if(PTIMB[PTIMB[address]] == address): #Check if address is a closed loop
+                return PTIMB[address + 1]
+            else:
+                breakpoint("Cannot identify a non-existent array","fatal")
+
+def getArray(address: int):
+    construct = []
+    if(PTIMB[address] != 0): #Check if address is empty
+            if(PTIMB[PTIMB[address]] == address): #Check if address is a closed loop
+                for i in range(PTIMB[address+1]):
+                    construct.append(PTIMB[address + i + 2])
+                return construct
+            else:
+                breakpoint("Cannot identify a non-existent array","fatal")
+    return(construct)
+
 def addEscInt(item, outpIndex):
     
     result = int(item)
@@ -205,7 +236,13 @@ def arithmetic(address: int, operation: str, term: int, mode: str = "noWrite"):
     if(mode == "noWrite"):
         return(result)
     elif(mode == "write"):
-        PTIMB[address] = result
+        if(result <= 256):
+            PTIMB[address] = result
+        else:
+            breakpoint("Integer is too large to write... Dumping PTIMB")
+            printRAM(1, 100)
+            breakpoint("Integer is too large to write... PTIMB Dumped")
+        
         if(type(PTIMB[address]) != int ):
             print(f"WARNING: Incorrect type assignment put to address {address}")
         return(result)
@@ -215,13 +252,32 @@ def arithmetic(address: int, operation: str, term: int, mode: str = "noWrite"):
 def purgeArray(address: int):
     if(PTIMB[address] != 0): #Check if address is empty
         if(PTIMB[PTIMB[address]] == address): #Check if address is a closed loop
-            for i in range(PTIMB[address+1]):
-                PTIMB[PTIMB[address] + i + 1] = 0
+            for i in range(PTIMB[address+1] + 1):
+                PTIMB[address + i + 1] = 0
             PTIMB[PTIMB[address]] = 0
             PTIMB[address] = 0
-            
         else:
             breakpoint("Cannot purge a non-existent array","fatal")
+
+def printArray(address: int):
+    global Display
+    if(PTIMB[address] != 0): #Check if address is empty
+        if(PTIMB[PTIMB[address]] == address): #Check if address is a closed loop
+            for i in range(PTIMB[address+1]):
+                Display.append(PTIMB[address + i + 2])
+        else:
+            breakpoint("Cannot print a non-existent array","fatal")
+
+def printTCI(input):
+    global Display
+    Display.append(input)
+
+def endProcess(address):
+    assetLocation = getItem(processPTIMBaddress, address)
+    for i in getArray(assetLocation):
+        purgeArray(i)
+    purgeArray(assetLocation)
+    PTIMB[address] = 0
 
 def loadProcess(code):
     # Asset Array Key:
@@ -263,61 +319,89 @@ def CitrusTranslate(program: str):
 
     return buildProgram
 
-# -- START RUNNING --
- 
-# Initialize important variables for Processes
-processPTIMBaddress = 1
-PTIMB_AvaiableAddress = 0
-byteSize = 16
+def renderTCI():
+    global Display
 
-SystemStart()
+    tacoin.pgHome()
+    Display.append(talkbox)
+    tacoin.renderList(Display)
+    Display.pop()
+    pygame.display.flip()
+
+def readKeyboard():
+    global talkbox
+
+    if event.type == pygame.TEXTINPUT:
+        talkbox += event.text
+        renderTCI()
+
+    elif event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_BACKSPACE:
+            talkbox = talkbox[:-1]
+            
+            renderTCI()
+        if event.key == pygame.K_RETURN:
+                    Display.append(talkbox)
+                    talkbox = ""
+                    
+                    renderTCI()
+
+# -- START RUNNING --
+
+SystemStart() # Start Tang
+tacoin.start() # Start TACOIN Renderer
 
 # Where processes are registered to run
 newData(processPTIMBaddress,10)
 
 loadProcess(CitrusTranslate("[PUSH][204][PUSH][255][PUSH][255]"))
 
-#loadProcess("1,2,3,100,3,66")
+# The goal now is to have a process be able to recognize when it has finished and purge all of the arrays and variables it has and all the PTIMB space it has taken up.
+# Have a list that records all voids in the PTIMB
+# Then have two processes run side by side.
 
-# Print out a section of ram from beginning to 100 for debugging
+printTCI("Tang v01 | MINFOU") # "What software am I using again?"
+
+while running:
+    # Process stuff
+
+    count = PTIMB[processPTIMBaddress + 1]
+    #printTCI(count)
+    if(count > 0):
+        #Find indexes & locations, while updating changed data.
+        currentProcAssetsIndex = toInt(getItem(processPTIMBaddress, processPointer))
+        currentProcCodeIndex = getIndex(currentProcAssetsIndex, 0)
+        currentProcIP = toInt(getItem(currentProcAssetsIndex, 2))
+        currentProcIPaddress = getIndex(currentProcAssetsIndex, 2)
+        currentProcStackAddress = toInt(getItem(currentProcAssetsIndex, 1))
+        currentProcReadState = toInt(getItem(currentProcAssetsIndex, 3))
+        currentProcReadStateAddress = getIndex(currentProcAssetsIndex, 3)
+        #print(f"DEBUG: Assets Index: {currentProcAssetsIndex}, Code Index: {currentProcCodeIndex}, IP Address: {currentProcIPaddress}, Read State Address: {currentProcReadStateAddress}, Stack Address: {currentProcStackAddress}")
+
+        # Read item
+        CitrusReadComponent(PTIMB[currentProcIP])
+        arithmetic(currentProcIPaddress, "+", 1, "write")
+        #print(f"DEBUG: {currentProcReadState == toInt(PTIMB[currentProcReadStateAddress])}, the value is {toInt(PTIMB[currentProcReadStateAddress])} and {currentProcReadState}")
+        #print(f"DEBUG: Instruction pointer: {currentProcIP}")
+        if(PTIMB[currentProcCodeIndex + 1] < PTIMB[currentProcIPaddress]):
+            endProcess(getIndex(processPTIMBaddress, processPointer))
 
 
-processPointer = 0
-count = toInt(PTIMB[processPTIMBaddress + 1]) - 1
-#print("DEBUG " + str(count))
-
-for x in range(6):
-    #Find indexes & locations, while updating changed data.
-    currentProcAssetsIndex = toInt(getItem(processPTIMBaddress, processPointer))
-    currentProcCodeIndex = getIndex(currentProcAssetsIndex, 0)
-    currentProcIP = toInt(getItem(currentProcAssetsIndex, 2))
-    currentProcIPaddress = getIndex(currentProcAssetsIndex, 2)
-    currentProcStackAddress = toInt(getItem(currentProcAssetsIndex, 1))
-    currentProcReadState = toInt(getItem(currentProcAssetsIndex, 3))
-    currentProcReadStateAddress = getIndex(currentProcAssetsIndex, 3)
-    #print(f"DEBUG: Assets Index: {currentProcAssetsIndex}, Code Index: {currentProcCodeIndex}, IP Address: {currentProcIPaddress}, Read State Address: {currentProcReadStateAddress}, Stack Address: {currentProcStackAddress}")
-
-    # Read item
-    CitrusReadComponent(PTIMB[currentProcIP])
-    arithmetic(currentProcIPaddress, "+", 1, "write")
-    #print(f"DEBUG: {currentProcReadState == toInt(PTIMB[currentProcReadStateAddress])}, the value is {toInt(PTIMB[currentProcReadStateAddress])} and {currentProcReadState}")
-    #print(f"DEBUG: Instruction pointer: {currentProcIP}")
-
-    #Increase insruction pointer
+    # Increase insruction pointer
     processPointer += 1 
     if(processPointer > count):
-        processPointer = 0
+        processPointer = 0 # They call me chicken parmesan the way I get lost in the sauce.
 
-printRAM(0,100)
-print("Purging array...")
-purgeArray(40)
-printRAM(0,100)
+    # Terminal stuff
 
-while True:
     for event in pygame.event.get():
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_c:
                 if pygame.key.get_mods() & pygame.KMOD_CTRL:
                     endTang()
-    tacoin.render("Hello, World!")
-    pass
+            if event.key == pygame.K_F4:
+                if pygame.key.get_mods() & pygame.KMOD_LALT:
+                    endTang()
+
+        readKeyboard() # <- Input
+    
