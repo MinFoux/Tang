@@ -80,12 +80,12 @@ def renderln(input_list):
     screenY += 16
     render(input_list)
 
-def renderList(input_list):
+def renderList(input_list, scroll = 0):
     global resHeight
     global resWidth
     fit = int(resHeight/(textSize * 8))
     printingRange = len(input_list) - fit
-    index = printingRange
+    index = printingRange - scroll
     if(index < 0):
         index = 0
     if(fit > len(input_list)):

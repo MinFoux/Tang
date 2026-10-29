@@ -19,6 +19,7 @@ def SystemStart():
     global processPTIMBaddress
     global Display
     global processPointer
+    global scroll
 
     processPTIMBaddress = 1
     PTIMB_AvaiableAddress = 0
@@ -30,6 +31,7 @@ def SystemStart():
     running = True
     talkbox = ""
     processPointer = 0
+    scroll = 0
     
 def breakpoint(msg: str, mode: str = "non-fatal"):
     if mode == "fatal":
@@ -181,10 +183,10 @@ def CitrusReadComponent(byte: int):
     
     if(PTIMB[currentProcReadStateAddress] == 1):
         if(byte == 1): #Debug
-            print("Component read successfully")
+            printTCI("Component read successfully")
                     
         if(byte == 2): #Get Interpreter
-            print("The current interpreter is Citrus")
+            printTCI("The current interpreter is Citrus")
             
         if(byte == 3): #PUSH
             PTIMB[currentProcReadStateAddress] = 2
@@ -324,7 +326,7 @@ def renderTCI():
 
     tacoin.pgHome()
     Display.append(talkbox)
-    tacoin.renderList(Display)
+    tacoin.renderList(Display, scroll)
     Display.pop()
     pygame.display.flip()
 
@@ -361,6 +363,7 @@ loadProcess(CitrusTranslate("[PUSH][204][PUSH][255][PUSH][255]"))
 # Then have two processes run side by side.
 
 printTCI("Tang v01 | MINFOU") # "What software am I using again?"
+renderTCI()
 
 while running:
     # Process stuff
@@ -402,6 +405,12 @@ while running:
             if event.key == pygame.K_F4:
                 if pygame.key.get_mods() & pygame.KMOD_LALT:
                     endTang()
+            if event.key == pygame.K_UP:
+                scroll += 1
+                renderTCI()
+            if event.key == pygame.K_DOWN:
+                scroll -= 1
+                renderTCI()
 
         readKeyboard() # <- Input
     
