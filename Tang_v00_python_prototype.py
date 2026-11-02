@@ -3,9 +3,11 @@ import json
 import tacoin
 import mint
 import pygame
+import time
 
-mint.PLACEHOLDER() # Just keep mint in mind (Super placeholder)
-#Definitions
+mint.PLACEHOLDER() # Just to keep mint in mind, otherwise I'd forget about mint.
+# Be prepared to see SO MUCH spaghetti code that you'd think I'm Italian 
+# Definitions
 
 def SystemStart():
     # Init globals
@@ -13,33 +15,72 @@ def SystemStart():
     global PTIMB_Size
     global maxByteAmount
     global running
+    global terminalRunning
+    global systemRunning
     global talkbox
+    global talkboxPrefix
     global byteSize
     global PTIMB_AvaiableAddress
     global processPTIMBaddress
     global Display
     global processPointer
     global scroll
-
-    processPTIMBaddress = 1
-    PTIMB_AvaiableAddress = 0
+    global sys_rules
+    global cursorState
+    global cursorLastFlash
+    global cursorFlashInterval
+    global cursorCharacter
+    
+    # PTIMB Configuration
+    processPTIMBaddress = 1 # Where the process list is kept
+    PTIMB_AvaiableAddress = 0 # Points towards the next available spot in PTIMB
     byteSize = 16
-    Display = []
     maxByteAmount = toInt("1"*byteSize, "string") # Decides how long PTIMB should be
     PTIMB_Size = maxByteAmount
     PTIMB = bytearray(PTIMB_Size) # Thus it begins
-    running = True
-    talkbox = ""
+
+    # Process Management
     processPointer = 0
+
+    # System State
+    running = True
+    terminalRunning = True
+    systemRunning = True
+
+    # Display & Interface
+    
+    Display = []
     scroll = 0
+    talkboxPrefix = "$"
+    talkbox = talkboxPrefix
+    cursorState = True
+    cursorLastFlash = time.time()
+    cursorFlashInterval = 0.3
+    cursorCharacter = "xFF"
+
+    # System Rules
+    sys_rules = ["nonStrict"]
     
 def breakpoint(msg: str, mode: str = "non-fatal"):
+    global running
+    global systemRunning
     if mode == "fatal":
-        print(f"FATAL BREAKPOINT: {msg}")
-        sys.exit()
+        msg = f"FATAL BREAKPOINT: {msg}"
+        if(terminalRunning):
+            systemRunning = False
+            printTCI(msg, True)
+        else:
+            sys.exit
+            print(msg)
     else:
         print(f"BREAKPOINT: {msg}")
-        running = False
+
+        if(terminalRunning):
+            systemRunning = False
+            printTCI(msg, True)
+        else:
+            sys.exit
+            print(msg)
              
 def toString(number: int) -> str:
 
@@ -51,6 +92,13 @@ def toString(number: int) -> str:
     return f"{number:0{byteSize}b}"
 
 def endTang():
+    global running
+    global systemRunning
+    global terminalRunning
+
+    running = False
+    systemRunning = False
+    terminalRunning = False
     pygame.display.quit()
     pygame.quit()
     sys.exit()
@@ -220,6 +268,23 @@ def printRAM(start: int, finish: int, mode = "string"):
             else:
                 print(f"{PTIMB[x]}    -    [{i2}] <------ WARNING: Not a bit")
             i2 += 1
+    elif(mode == "display"):
+        columnRange = finish - start
+        columnIndex = 0
+        rowConstruct = ""
+        startingItem = start - 1
+        columnLength = 5
+        columnSpacing = 6
+        rowLength = int(columnRange/columnLength)
+        for i in range(int(rowLength)):
+            startingItem += 1
+            for x in range(columnLength):
+                singleItem = str(PTIMB[startingItem + x*rowLength])
+                rowConstruct = rowConstruct + singleItem + " "*(columnSpacing - len(singleItem)) 
+                columnIndex += 1
+            printTCI(rowConstruct)
+            rowConstruct = ""
+        renderTCI()
         
 def arithmetic(address: int, operation: str, term: int, mode: str = "noWrite"):
     
@@ -253,15 +318,19 @@ def arithmetic(address: int, operation: str, term: int, mode: str = "noWrite"):
 
 def purgeArray(address: int):
     if(PTIMB[address] != 0): #Check if address is empty
-        if(PTIMB[PTIMB[address]] == address): #Check if address is a closed loop
+        if(PTIMB[PTIMB[address]] == address): #Check if address is a closed loop (End points to begining and begining points to end)
             for i in range(PTIMB[address+1] + 1):
                 PTIMB[address + i + 1] = 0
             PTIMB[PTIMB[address]] = 0
             PTIMB[address] = 0
         else:
-            breakpoint("Cannot purge a non-existent array","fatal")
+            if("nonStrict" in sys_rules):
+                breakpoint("Attempted to purge a non-existent array, dumping RAM.")
+                printRAM(0,100, "display")
+            else:
+                breakpoint("Cannot purge a non-existent array","fatal")
 
-def printArray(address: int):
+def printArray(address: int, ):
     global Display
     if(PTIMB[address] != 0): #Check if address is empty
         if(PTIMB[PTIMB[address]] == address): #Check if address is a closed loop
@@ -270,9 +339,13 @@ def printArray(address: int):
         else:
             breakpoint("Cannot print a non-existent array","fatal")
 
-def printTCI(input):
-    global Display
-    Display.append(input)
+def printTCI(input, refresh = False):
+    global Display, terminalRunning
+    if(terminalRunning):
+        Display.append(input)
+    if(refresh):
+        renderTCI()
+    print(input)
 
 def endProcess(address):
     assetLocation = getItem(processPTIMBaddress, address)
@@ -290,10 +363,10 @@ def loadProcess(code):
     assetAddress = alloc(10) #Create asset array
     codeAddress = alloc(10) # Create container for the code to go in
     stackAddress = alloc(10) # Create stack array
-    addItem(assetAddress, codeAddress) # Register code array as asset
-    addItem(assetAddress, stackAddress) # Register Stack array as asset
-    addItem(assetAddress, codeAddress + 2) # Instruction pointer asset
-    addItem(assetAddress, 1) # Read state asset
+    addItem(assetAddress, codeAddress) # Register code array as asset as pos:0
+    addItem(assetAddress, stackAddress) # Register Stack array as asset at pos:1
+    addItem(assetAddress, codeAddress + 2) # Instruction pointer asset at pos:2
+    addItem(assetAddress, 1) # Read state asset at pos:3
     splitString(code, "," , codeAddress) # Split code into code array
     addItem(processPTIMBaddress, assetAddress) # Register process after asset array is fully assembled
     
@@ -321,32 +394,52 @@ def CitrusTranslate(program: str):
 
     return buildProgram
 
-def renderTCI():
-    global Display
-
-    tacoin.pgHome()
-    Display.append(talkbox)
-    tacoin.renderList(Display, scroll)
-    Display.pop()
-    pygame.display.flip()
+def renderTCI(refreshBG = True):
+    global Display, talkbox, scroll
+    if(refreshBG):
+        tacoin.pgHome() # Redraw background
+        Display.append(talkbox) # Put talkbox at the end so the user feels like they're typing into something.
+        scroll = tacoin.renderList(Display, scroll)
+    else:
+        Display2 = [talkbox[len(talkbox) - 1]]   
+        tacoin.render(Display2)
+    
+     # Render the Display
+    if(refreshBG): Display.pop() # Remove talkbox from the end so it doesnt actually interfere with anything
+    pygame.display.flip() # Don't know what this is; for all I know, it could be a placebo.
 
 def readKeyboard():
     global talkbox
+    global cursorState
+    global cursorLastFlash
 
     if event.type == pygame.TEXTINPUT:
         talkbox += event.text
-        renderTCI()
+        drawCursor(False) # Remove cursor debris
+        renderTCI(False) # Render the next character
+        cursorState = True
+        cursorLastFlash = time.monotonic()
 
     elif event.type == pygame.KEYDOWN:
         if event.key == pygame.K_BACKSPACE:
-            talkbox = talkbox[:-1]
+            if(len(talkbox) != len(talkboxPrefix)):
+                talkbox = talkbox[:-1]
             
             renderTCI()
         if event.key == pygame.K_RETURN:
-                    Display.append(talkbox)
-                    talkbox = ""
-                    
-                    renderTCI()
+            Display.append(talkbox)
+            talkbox = talkboxPrefix
+            renderTCI()
+
+def drawCursor(state):
+    
+    if(state):
+        tacoin.draw_character(tacoin.loadChar(cursorCharacter), tacoin.screenX, tacoin.screenY, 2, [0, 255, 0])
+
+    else:
+        tacoin.draw_character(tacoin.loadChar(cursorCharacter), tacoin.screenX, tacoin.screenY, 2, [0, 0, 0])
+
+    pygame.display.flip()    
 
 # -- START RUNNING --
 
@@ -356,61 +449,65 @@ tacoin.start() # Start TACOIN Renderer
 # Where processes are registered to run
 newData(processPTIMBaddress,10)
 
-loadProcess(CitrusTranslate("[PUSH][204][PUSH][255][PUSH][255]"))
+loadProcess(CitrusTranslate("[PUSH][204][PUSH][255][PUSH][255]")) # Test program
+#loadProcess(CitrusTranslate("[PUSH][104][PUSH][155][PUSH][155]")) # Test program
 
-# The goal now is to have a process be able to recognize when it has finished and purge all of the arrays and variables it has and all the PTIMB space it has taken up.
-# Have a list that records all voids in the PTIMB
-# Then have two processes run side by side.
-
-printTCI("Tang v01 | MINFOU") # "What software am I using again?"
-renderTCI()
+printTCI("Tang v01 | TACOIN v01 | MinFou", True) # "What software am I using again?"
 
 while running:
+
     # Process stuff
+    if(systemRunning):
 
-    count = PTIMB[processPTIMBaddress + 1]
-    #printTCI(count)
-    if(count > 0):
-        #Find indexes & locations, while updating changed data.
-        currentProcAssetsIndex = toInt(getItem(processPTIMBaddress, processPointer))
-        currentProcCodeIndex = getIndex(currentProcAssetsIndex, 0)
-        currentProcIP = toInt(getItem(currentProcAssetsIndex, 2))
-        currentProcIPaddress = getIndex(currentProcAssetsIndex, 2)
-        currentProcStackAddress = toInt(getItem(currentProcAssetsIndex, 1))
-        currentProcReadState = toInt(getItem(currentProcAssetsIndex, 3))
-        currentProcReadStateAddress = getIndex(currentProcAssetsIndex, 3)
-        #print(f"DEBUG: Assets Index: {currentProcAssetsIndex}, Code Index: {currentProcCodeIndex}, IP Address: {currentProcIPaddress}, Read State Address: {currentProcReadStateAddress}, Stack Address: {currentProcStackAddress}")
-
-        # Read item
-        CitrusReadComponent(PTIMB[currentProcIP])
-        arithmetic(currentProcIPaddress, "+", 1, "write")
-        #print(f"DEBUG: {currentProcReadState == toInt(PTIMB[currentProcReadStateAddress])}, the value is {toInt(PTIMB[currentProcReadStateAddress])} and {currentProcReadState}")
-        #print(f"DEBUG: Instruction pointer: {currentProcIP}")
-        if(PTIMB[currentProcCodeIndex + 1] < PTIMB[currentProcIPaddress]):
-            endProcess(getIndex(processPTIMBaddress, processPointer))
+        count = PTIMB[processPTIMBaddress + 1]
+        #printTCI(count)
+        if(count > 0):
+            #Find indexes & locations, while updating changed data.
+            currentProcAssetsIndex = toInt(getItem(processPTIMBaddress, processPointer)) 
+            currentProcCodeIndex = getIndex(currentProcAssetsIndex, 0)
+            currentProcIP = toInt(getItem(currentProcAssetsIndex, 2))
+            currentProcIPaddress = getIndex(currentProcAssetsIndex, 2)
+            currentProcStackAddress = toInt(getItem(currentProcAssetsIndex, 1))
+            currentProcReadState = toInt(getItem(currentProcAssetsIndex, 3))
+            currentProcReadStateAddress = getIndex(currentProcAssetsIndex, 3)
+            # Read item
+            CitrusReadComponent(PTIMB[currentProcIP]) # Read the current instruction via Citrus Binary
+            arithmetic(currentProcIPaddress, "+", 1, "write") # Increment instruction pointer
+            if(PTIMB[currentProcCodeIndex + 1] < PTIMB[currentProcIPaddress]): # Compares the length of the code to the IP; terminates if the IP is too big.
+                endProcess(getIndex(processPTIMBaddress, processPointer)) # Kill the process cuz it's too long
 
 
-    # Increase insruction pointer
-    processPointer += 1 
-    if(processPointer > count):
-        processPointer = 0 # They call me chicken parmesan the way I get lost in the sauce.
+        # Increase insruction pointer
+        processPointer += 1 
+        if(processPointer > count):
+            processPointer = 0 # They call me chicken parmesan the way I get lost in the sauce.
 
     # Terminal stuff
+    if(terminalRunning):
+        current_time = time.monotonic()
+        if current_time - cursorLastFlash >= cursorFlashInterval:
+            cursorState = not cursorState
+            cursorLastFlash = current_time
+        drawCursor(cursorState)
 
-    for event in pygame.event.get():
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_c:
-                if pygame.key.get_mods() & pygame.KMOD_CTRL:
-                    endTang()
-            if event.key == pygame.K_F4:
-                if pygame.key.get_mods() & pygame.KMOD_LALT:
-                    endTang()
-            if event.key == pygame.K_UP:
-                scroll += 1
-                renderTCI()
-            if event.key == pygame.K_DOWN:
-                scroll -= 1
-                renderTCI()
 
-        readKeyboard() # <- Input
-    
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN:
+                # Termination of the terminal
+                if event.key == pygame.K_c:
+                    if pygame.key.get_mods() & pygame.KMOD_CTRL:
+                        endTang()
+                if event.key == pygame.K_F4:
+                    if pygame.key.get_mods() & pygame.KMOD_LALT:
+                        endTang()
+
+                # Terminal interface interaction
+                if event.key == pygame.K_UP:
+                    scroll += 1
+                    renderTCI()
+                if event.key == pygame.K_DOWN:
+                    scroll -= 1
+                    renderTCI()
+            
+            readKeyboard() # <- Actual for-real keyboard input
+        
